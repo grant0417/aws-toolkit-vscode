@@ -28,7 +28,8 @@ export { listCodeWhispererCommandsWalkthrough } from '../codewhisperer/ui/status
 export { focusAmazonQPanel, focusAmazonQPanelKeybinding } from '../codewhispererChat/commands/registerCommands'
 export { TryChatCodeLensProvider, tryChatCodeLensCommand } from '../codewhispererChat/editor/codelens'
 export { createAmazonQUri, openDiff, openDeletedDiff, getOriginalFileUri, getFileDiffUris } from './commons/diff'
-
+export { CodeReference } from '../codewhispererChat/view/connector/connector'
+export { AuthMessageDataMap, AuthFollowUpType } from './auth/model'
 /**
  * main from createMynahUI is a purely browser dependency. Due to this
  * we need to create a wrapper function that will dynamically execute it
