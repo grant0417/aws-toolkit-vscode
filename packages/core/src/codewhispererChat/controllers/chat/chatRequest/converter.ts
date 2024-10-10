@@ -11,7 +11,7 @@ import {
     SymbolType,
     TextDocument,
 } from '@amzn/codewhisperer-streaming'
-import { TriggerPayload } from '../model'
+import { ChatTriggerType, TriggerPayload } from '../model'
 import { undefinedIfEmpty } from '../../../../shared'
 
 const fqnNameSizeDownLimit = 1
@@ -99,6 +99,13 @@ export function triggerPayloadToChatRequest(triggerPayload: TriggerPayload): Gen
     // service will throw validation exception if string is empty
     const customizationArn: string | undefined = undefinedIfEmpty(triggerPayload.customization.arn)
 
+    const isInlineChat = triggerPayload.trigger === ChatTriggerType.InlineChatMessage
+    // const chatTriggerType = isInlineChat ? 'INLINE_CHAT' : 'MANUAL'
+    const chatTriggerType = 'MANUAL'
+    const userInputMessageContext = isInlineChat
+        ? undefined
+        : { editorState: { document, cursorState, relevantDocuments, useRelevantDocuments } }
+
     return {
         conversationState: {
             currentMessage: {
@@ -106,18 +113,11 @@ export function triggerPayloadToChatRequest(triggerPayload: TriggerPayload): Gen
                     content: triggerPayload.message
                         ? triggerPayload.message.substring(0, customerMessageSizeLimit)
                         : '',
-                    userInputMessageContext: {
-                        editorState: {
-                            document,
-                            cursorState,
-                            relevantDocuments,
-                            useRelevantDocuments,
-                        },
-                    },
+                    userInputMessageContext,
                     userIntent: triggerPayload.userIntent,
                 },
             },
-            chatTriggerType: 'MANUAL',
+            chatTriggerType,
             customizationArn: customizationArn,
         },
     }

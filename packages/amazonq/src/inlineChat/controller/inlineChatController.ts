@@ -32,7 +32,7 @@ export class InlineChatController {
     public async createTask(
         query: string,
         document: vscode.TextDocument,
-        selectionRange: vscode.Range
+        selectionRange: vscode.Selection
     ): Promise<InlineTask> {
         const inlineTask = new InlineTask(query, document, selectionRange)
         return inlineTask
@@ -43,7 +43,7 @@ export class InlineChatController {
             return
         }
         const editor = vscode.window.visibleTextEditors.find(
-            (editor) => editor.document.uri.toString() === task.document.uri.toString()
+            (editor) => editor.document.uri.toString() === task.editorDocument.uri.toString()
         )
         if (!editor) {
             return
@@ -75,7 +75,7 @@ export class InlineChatController {
             return
         }
         const editor = vscode.window.visibleTextEditors.find(
-            (editor) => editor.document.uri.toString() === task.document.uri.toString()
+            (editor) => editor.document.uri.toString() === task.editorDocument.uri.toString()
         )
         if (!editor) {
             return
@@ -187,7 +187,7 @@ export class InlineChatController {
         this.codeLenseProvider.updateLenses(task)
         await this.refreshCodeLenses(task)
         if (task.state === TaskState.Complete) {
-            this.reset()
+            await this.reset()
         }
     }
 
@@ -198,16 +198,17 @@ export class InlineChatController {
         this.task.state = TaskState.Error
         this.codeLenseProvider.updateLenses(this.task)
         await this.refreshCodeLenses(this.task)
-        this.reset()
+        await this.reset()
     }
 
-    private reset() {
+    private async reset() {
         this.task = undefined
         this.codeLenseProvider.setTask(undefined)
+        await setContext('amazonq.inline.codelensShortcutEnabled', undefined)
     }
 
     private async refreshCodeLenses(task: InlineTask): Promise<void> {
-        await vscode.commands.executeCommand('vscode.executeCodeLensProvider', task.document.uri)
+        await vscode.commands.executeCommand('vscode.executeCodeLensProvider', task.editorDocument.uri)
     }
 
     public async inlineQuickPick(previouseQuery?: string) {
@@ -304,8 +305,11 @@ export class InlineChatController {
                 }
             }
 
-            this.task.responseStartLatency = responseStartLatency
-            this.task.responseEndLatency = performance.now() - requestStart
+            if (this.task) {
+                // Unclear why we need to check if task is defined, but occasionally an error occurs otherwise
+                this.task.responseStartLatency = responseStartLatency
+                this.task.responseEndLatency = performance.now() - requestStart
+            }
             if (codeChunkCounter === 1) {
                 // If the code response has only one chunk, we don't need to execute the final diff
                 await this.updateTaskAndLenses(this.task, TaskState.WaitingForDecision)
@@ -326,6 +330,7 @@ export class InlineChatController {
                 this.decorator.applyDecorations(this.task)
                 await this.updateTaskAndLenses(this.task, TaskState.WaitingForDecision)
                 await setContext('amazonq.inline.codelensShortcutEnabled', true)
+                this.undoListener(this.task)
             } else {
                 void messages.showMessageWithCancel(
                     'No suggestions from Q, please try different instructions.',
@@ -335,7 +340,6 @@ export class InlineChatController {
                 await this.inlineQuickPick(this.userQuery)
                 await this.handleError()
             }
-            this.undoListener(this.task)
         }
     }
 
@@ -346,7 +350,7 @@ export class InlineChatController {
     ) {
         const adjustedTextDiff = adjustTextDiffForEditing(textDiff)
         const visibleEditor = vscode.window.visibleTextEditors.find(
-            (editor) => editor.document.uri === task.document.uri
+            (editor) => editor.document.uri === task.editorDocument.uri
         )
         if (visibleEditor) {
             await visibleEditor.edit(
@@ -363,7 +367,7 @@ export class InlineChatController {
             const edit = new vscode.WorkspaceEdit()
             for (const change of textDiff) {
                 if (change.type === 'insertion') {
-                    edit.insert(task.document.uri, change.range.start, change.replacementText)
+                    edit.insert(task.editorDocument.uri, change.range.start, change.replacementText)
                 }
             }
             await vscode.workspace.applyEdit(edit)
@@ -374,7 +378,7 @@ export class InlineChatController {
         const listener: vscode.Disposable = vscode.workspace.onDidChangeTextDocument(async (event) => {
             const { document, contentChanges } = event
 
-            if (document.uri.toString() !== task.document.uri.toString()) {
+            if (document.uri.toString() !== task.editorDocument.uri.toString()) {
                 return
             }
 

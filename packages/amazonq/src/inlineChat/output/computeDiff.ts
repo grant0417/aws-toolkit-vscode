@@ -6,16 +6,15 @@ import { type LinesOptions, diffLines, Change } from 'diff'
 import * as vscode from 'vscode'
 import { InlineTask, TextDiff } from '../controller/inlineTask'
 
-export function computeDiff(response: string, inlinTask: InlineTask, isPartialDiff: boolean): TextDiff[] | undefined {
+export function computeDiff(response: string, inlineTask: InlineTask, isPartialDiff: boolean): TextDiff[] | undefined {
     if (!response) {
         return
     }
-    const selectedRange = inlinTask.selectedRange
-    const selectedText = isPartialDiff ? inlinTask.partialSelectedText ?? '' : inlinTask.selectedText
+    const selectedRange = inlineTask.selectedRange
+    const selectedText = isPartialDiff ? inlineTask.partialSelectedText ?? '' : inlineTask.selectedText
 
-    const leadingWhitespace = getLeadingWhitespace(selectedText)
-    const trailingWhitespace = getTrailingWhitespace(selectedText)
-    const normalizedResponse = leadingWhitespace + response.trim() + trailingWhitespace
+    const normalizedResponse =
+        getLeadingWhitespace(selectedText) + response.trim() + getTrailingWhitespace(selectedText)
 
     let startLine = selectedRange.start.line
     const textDiff: TextDiff[] = []
@@ -50,7 +49,7 @@ export function computeDiff(response: string, inlinTask: InlineTask, isPartialDi
         }
         startLine += count
     })
-    inlinTask.diff = textDiff
+    inlineTask.diff = textDiff
     return textDiff
 }
 

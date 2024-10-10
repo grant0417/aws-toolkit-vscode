@@ -56,7 +56,7 @@ export class CodelensProvider implements vscode.CodeLensProvider {
             case TaskState.InProgress:
                 this.codeLenses = []
                 this.codeLenses.push(
-                    new vscode.CodeLens(new vscode.Range(task.selectionRange.start, task.selectionRange.start), {
+                    new vscode.CodeLens(new vscode.Range(task.selectedRange.start, task.selectedRange.start), {
                         title: 'Amazon Q is generating...',
                         command: '',
                     })
@@ -66,14 +66,14 @@ export class CodelensProvider implements vscode.CodeLensProvider {
                 this.codeLenses = []
 
                 this.codeLenses.push(
-                    new vscode.CodeLens(new vscode.Range(task.selectionRange.start, task.selectionRange.start), {
+                    new vscode.CodeLens(new vscode.Range(task.selectedRange.start, task.selectedRange.start), {
                         title: 'Accept all ($(newline))',
                         command: 'aws.amazonq.inline.waitForUserDecisionAcceptAll',
                         arguments: [task],
                     })
                 )
                 this.codeLenses.push(
-                    new vscode.CodeLens(new vscode.Range(task.selectionRange.start, task.selectionRange.start), {
+                    new vscode.CodeLens(new vscode.Range(task.selectedRange.start, task.selectedRange.start), {
                         title: `Reject all ( \u238B )`,
                         command: 'aws.amazonq.inline.waitForUserDecisionRejectAll',
                         arguments: [task],

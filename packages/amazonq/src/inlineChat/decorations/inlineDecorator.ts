@@ -27,7 +27,7 @@ export class InlineDecorator {
             return
         }
         const editors = vscode.window.visibleTextEditors.filter(
-            (editor) => editor.document.uri.toString() === task.document.uri.toString()
+            (editor) => editor.document.uri.toString() === task.editorDocument.uri.toString()
         )
         for (const editor of editors) {
             editor.setDecorations(AddedTextDecorationType, decorations.linesAdded ?? [])

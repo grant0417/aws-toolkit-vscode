@@ -30,9 +30,10 @@ export interface CodeWhispererConfig {
     readonly endpoint: string
 }
 
+// TODO: revert before merge!!
 export const defaultServiceConfig: CodeWhispererConfig = {
-    region: 'us-east-1',
-    endpoint: 'https://codewhisperer.us-east-1.amazonaws.com/',
+    region: 'us-west-2',
+    endpoint: 'https://rts.alpha-us-west-2.codewhisperer.ai.aws.dev/',
 }
 
 export function getCodewhispererConfig(): CodeWhispererConfig {

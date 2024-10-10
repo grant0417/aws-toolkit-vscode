@@ -90,7 +90,7 @@ ${userQuery}`
                 return this.generateResponse(
                     {
                         message: message.message,
-                        trigger: ChatTriggerType.ChatMessage,
+                        trigger: ChatTriggerType.InlineChatMessage,
                         query: message.message,
                         codeSelection: context?.focusAreaContext?.selectionInsideExtendedCodeBlock,
                         fileText: context?.focusAreaContext?.extendedCodeBlock,

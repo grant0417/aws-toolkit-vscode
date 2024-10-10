@@ -129,6 +129,7 @@ export interface ChatItemFeedbackMessage {
 
 export enum ChatTriggerType {
     ChatMessage = 'ChatMessage',
+    InlineChatMessage = 'InlineChatMessage',
 }
 
 export interface TriggerPayload {

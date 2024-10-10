@@ -7,6 +7,7 @@ import { Decorations } from '../decorations/inlineDecorator'
 import { CodeReference } from 'aws-core-vscode/amazonq'
 import { computeDecorations } from '../decorations/computeDecorations'
 import type { InlineChatEvent } from 'aws-core-vscode/codewhisperer'
+import { expandSelectionToFullLines } from './utils'
 
 interface TextToInsert {
     type: 'insertion'
@@ -48,7 +49,6 @@ export class InlineTask {
     public selectedRange: vscode.Range
     public inProgressReplacement: string | undefined
     public replacement: string | undefined
-    public document: vscode.TextDocument
 
     // Telemetry fields
     public requestId?: string
@@ -58,28 +58,10 @@ export class InlineTask {
     constructor(
         public query: string,
         public editorDocument: vscode.TextDocument,
-        public selectionRange: vscode.Range
+        selection: vscode.Selection
     ) {
-        this.selectedRange = this.selectionRange
-        this.selectedText = this.getSelectedText(selectionRange, editorDocument)
-        this.document = editorDocument
-    }
-
-    private getSelectedText(selection: vscode.Range, document: vscode.TextDocument): string {
-        const startLine = selection.start.line
-        const endLine = selection.end.line
-        const endCharacter = selection.end.character
-
-        let startCharacter = selection.start.character
-        const lineText = document.lineAt(startLine).text
-
-        // Include leading whitespace if the selection starts with it
-        if (lineText.substring(0, startCharacter).trim().length === 0) {
-            startCharacter = 0
-        }
-
-        const range = new vscode.Range(startLine, startCharacter, endLine, endCharacter)
-        return document.getText(range)
+        this.selectedRange = expandSelectionToFullLines(editorDocument, selection)
+        this.selectedText = editorDocument.getText(this.selectedRange)
     }
 
     public revertDiff(): void {

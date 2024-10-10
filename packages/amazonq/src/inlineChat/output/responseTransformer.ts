@@ -30,14 +30,14 @@ export function responseTransformer(
             return undefined
         }
 
+        let intentationMatchedResponse: string
         if (!isWholeResponse) {
-            const partialSelectedCode = extractPartialCode(response, inlineTask)
+            const partialSelectedCode = extractPartialCode(codeBlock, inlineTask)
             inlineTask.partialSelectedText = partialSelectedCode
-            const intentationMatchedResponse = indentationFormatter(codeBlock, partialSelectedCode)
-            return intentationMatchedResponse
+            intentationMatchedResponse = indentationFormatter(codeBlock, inlineTask.partialSelectedText)
+        } else {
+            intentationMatchedResponse = indentationFormatter(codeBlock, inlineTask.selectedText)
         }
-
-        const intentationMatchedResponse = indentationFormatter(codeBlock, inlineTask.selectedText)
         return intentationMatchedResponse
     } catch (err) {
         if (err instanceof Error) {
