@@ -31,9 +31,14 @@ export interface CodeWhispererConfig {
 }
 
 // TODO: revert before merge!!
+// export const defaultServiceConfig: CodeWhispererConfig = {
+//     region: 'us-west-2',
+//     endpoint: 'https://rts.alpha-us-west-2.codewhisperer.ai.aws.dev/',
+// }
+
 export const defaultServiceConfig: CodeWhispererConfig = {
-    region: 'us-west-2',
-    endpoint: 'https://rts.alpha-us-west-2.codewhisperer.ai.aws.dev/',
+    region: 'us-east-1',
+    endpoint: 'https://codewhisperer.us-east-1.amazonaws.com/',
 }
 
 export function getCodewhispererConfig(): CodeWhispererConfig {
@@ -227,6 +232,7 @@ export class DefaultCodeWhispererClient {
         const client = await this.createUserSdkClient()
         const requester = async (request: CodeWhispererUserClient.ListAvailableCustomizationsRequest) =>
             client.listAvailableCustomizations(request).promise()
+        // @ts-ignore
         return pageableToCollection(requester, {}, 'nextToken')
             .promise()
             .then((resps) => {

@@ -6,16 +6,17 @@
 import vscode from 'vscode'
 import { InlineChatController } from '../controller/inlineChatController'
 import { InlineTask } from '../controller/inlineTask'
-export function registerInlineCommands(context: vscode.ExtensionContext, inlineCahtController: InlineChatController) {
+
+export function registerInlineCommands(context: vscode.ExtensionContext, inlineChatController: InlineChatController) {
     context.subscriptions.push(
         vscode.commands.registerCommand('aws.amazonq.inline.waitForUserInput', async () => {
-            await inlineCahtController.inlineQuickPick()
+            await inlineChatController.inlineQuickPick()
         }),
         vscode.commands.registerCommand('aws.amazonq.inline.waitForUserDecisionAcceptAll', async (task: InlineTask) => {
-            await inlineCahtController.acceptAllChanges(task)
+            await inlineChatController.acceptAllChanges(task, true)
         }),
         vscode.commands.registerCommand('aws.amazonq.inline.waitForUserDecisionRejectAll', async (task: InlineTask) => {
-            await inlineCahtController.rejectAllChanges(task)
+            await inlineChatController.rejectAllChanges(task, true)
         })
     )
 

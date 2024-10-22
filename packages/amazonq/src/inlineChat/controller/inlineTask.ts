@@ -57,11 +57,11 @@ export class InlineTask {
 
     constructor(
         public query: string,
-        public editorDocument: vscode.TextDocument,
+        public document: vscode.TextDocument,
         selection: vscode.Selection
     ) {
-        this.selectedRange = expandSelectionToFullLines(editorDocument, selection)
-        this.selectedText = editorDocument.getText(this.selectedRange)
+        this.selectedRange = expandSelectionToFullLines(document, selection)
+        this.selectedText = document.getText(this.selectedRange)
     }
 
     public revertDiff(): void {
@@ -81,7 +81,7 @@ export class InlineTask {
     public updateDecorations(): void {
         const isEmpty =
             !this.decorations ||
-            (this.decorations.linesAdded.length === 0 && this.decorations.linesRemoved.length === 0)
+            (this.decorations?.linesAdded?.length === 0 && this.decorations?.linesRemoved?.length === 0)
 
         if (isEmpty) {
             return
@@ -139,5 +139,9 @@ export class InlineTask {
             numSuggestionDelLines,
         }
         return event
+    }
+
+    public isActiveState() {
+        return !(this.state === TaskState.Complete || this.state === TaskState.Error)
     }
 }

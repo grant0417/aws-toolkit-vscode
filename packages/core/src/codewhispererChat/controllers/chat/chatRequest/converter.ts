@@ -100,11 +100,8 @@ export function triggerPayloadToChatRequest(triggerPayload: TriggerPayload): Gen
     const customizationArn: string | undefined = undefinedIfEmpty(triggerPayload.customization.arn)
 
     const isInlineChat = triggerPayload.trigger === ChatTriggerType.InlineChatMessage
-    // const chatTriggerType = isInlineChat ? 'INLINE_CHAT' : 'MANUAL'
-    const chatTriggerType = 'MANUAL'
-    const userInputMessageContext = isInlineChat
-        ? undefined
-        : { editorState: { document, cursorState, relevantDocuments, useRelevantDocuments } }
+    const chatTriggerType = isInlineChat ? 'INLINE_CHAT' : 'MANUAL'
+    const userInputMessageContext = { editorState: { document, cursorState, relevantDocuments, useRelevantDocuments } }
 
     return {
         conversationState: {

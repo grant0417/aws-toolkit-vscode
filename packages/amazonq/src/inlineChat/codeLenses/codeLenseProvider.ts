@@ -5,8 +5,8 @@
 
 import * as vscode from 'vscode'
 import { InlineTask, TaskState } from '../controller/inlineTask'
+
 export class CodelensProvider implements vscode.CodeLensProvider {
-    private inlineTask: InlineTask | undefined
     private codeLenses: vscode.CodeLens[] = []
     private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>()
     public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event
@@ -16,32 +16,8 @@ export class CodelensProvider implements vscode.CodeLensProvider {
         this.provideCodeLenses = this.provideCodeLenses.bind(this)
     }
 
-    public provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): vscode.CodeLens[] {
-        if (!this.inlineTask) {
-            const editor = vscode.window.activeTextEditor
-            if (editor) {
-                const selection = editor.selection
-                if (!selection.isEmpty) {
-                    this.codeLenses = []
-                    this.codeLenses.push(
-                        new vscode.CodeLens(new vscode.Range(selection.start, selection.start), {
-                            title: 'Amazon Q: Edit ( \u2318  + I )',
-                            command: 'aws.amazonq.inline.waitForUserInput',
-                        })
-                    )
-                    this._onDidChangeCodeLenses.fire()
-                } else {
-                    this.codeLenses = []
-                    this._onDidChangeCodeLenses.fire()
-                }
-            }
-        }
-
+    public provideCodeLenses(_document: vscode.TextDocument, _token: vscode.CancellationToken): vscode.CodeLens[] {
         return this.codeLenses
-    }
-
-    public setTask(task: InlineTask | undefined) {
-        this.inlineTask = task
     }
 
     public updateLenses(task: InlineTask): void {
@@ -67,14 +43,14 @@ export class CodelensProvider implements vscode.CodeLensProvider {
 
                 this.codeLenses.push(
                     new vscode.CodeLens(new vscode.Range(task.selectedRange.start, task.selectedRange.start), {
-                        title: 'Accept all ($(newline))',
+                        title: 'Accept ($(newline))',
                         command: 'aws.amazonq.inline.waitForUserDecisionAcceptAll',
                         arguments: [task],
                     })
                 )
                 this.codeLenses.push(
                     new vscode.CodeLens(new vscode.Range(task.selectedRange.start, task.selectedRange.start), {
-                        title: `Reject all ( \u238B )`,
+                        title: `Reject ( \u238B )`,
                         command: 'aws.amazonq.inline.waitForUserDecisionRejectAll',
                         arguments: [task],
                     })

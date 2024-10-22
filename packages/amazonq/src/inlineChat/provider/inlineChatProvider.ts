@@ -41,40 +41,6 @@ export class InlineChatProvider {
         this.triggerEventsStorage = new TriggerEventsStorage()
     }
 
-    public getPureCodePrompt(userQuery: string, selectedText: string, language?: string): string {
-        const rules = [
-            '- Plan out the changes step-by-step before making them, this should be brief and not include any code',
-            '- Do not explain the code after, the plan and code are sufficient',
-        ]
-
-        if (selectedText.trim().length === 0) {
-            if (language) {
-                rules.push(`- Ensure the code is written in ${language}`)
-            }
-
-            return `Rules for writing code:
-${rules.join('\n')}
-
-Write a code snipped based on the following:
-${userQuery}`
-        } else {
-            rules.push(
-                '- If the query is a question only attempt to add comments to the code that answer it',
-                '- Make sure to preserve the original indentation, code formatting, tab size and structure as much as possible',
-                '- Do not change the code more than required, try to maintain variables, function names, and other identifiers'
-            )
-            return `\`\`\`${language ?? ''}
-${selectedText}
-\`\`\`
-
-Rules for rewriting the code:
-${rules.join('\n')}
-
-Rewrite the above code to do the following:
-${userQuery}`
-        }
-    }
-
     public async processPromptMessage(message: PromptMessage) {
         return this.editorContextExtractor
             .extractContextForTrigger('ChatMessage')

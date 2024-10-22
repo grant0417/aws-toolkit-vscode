@@ -11,9 +11,10 @@ import { responseTransformer } from '../output/responseTransformer'
 import { computeDiff, adjustTextDiffForEditing } from '../output/computeDiff'
 import { computeDecorations } from '../decorations/computeDecorations'
 import { CodelensProvider } from '../codeLenses/codeLenseProvider'
-import { ReferenceLogController, extractLanguageNameFromFile } from 'aws-core-vscode/codewhispererChat'
+import { ReferenceLogController } from 'aws-core-vscode/codewhispererChat'
 import { CodeWhispererSettings } from 'aws-core-vscode/codewhisperer'
-import { getLogger, messages, setContext, Timeout } from 'aws-core-vscode/shared'
+import { codicon, getIcon, getLogger, messages, setContext, Timeout } from 'aws-core-vscode/shared'
+import { InlineLineAnnotationController } from '../decorations/inlineLineAnnotationController'
 
 export class InlineChatController {
     private task: InlineTask | undefined
@@ -21,12 +22,14 @@ export class InlineChatController {
     private readonly inlineChatProvider: InlineChatProvider
     private readonly codeLenseProvider: CodelensProvider
     private readonly referenceLogController = new ReferenceLogController()
+    private readonly inlineLineAnnotationController: InlineLineAnnotationController
     private userQuery: string | undefined
 
     constructor(context: vscode.ExtensionContext) {
         this.inlineChatProvider = new InlineChatProvider()
         this.inlineChatProvider.onErrorOccured(() => this.handleError())
         this.codeLenseProvider = new CodelensProvider(context)
+        this.inlineLineAnnotationController = new InlineLineAnnotationController(context)
     }
 
     public async createTask(
@@ -38,22 +41,24 @@ export class InlineChatController {
         return inlineTask
     }
 
-    public async acceptAllChanges(task = this.task): Promise<void> {
+    public async acceptAllChanges(task = this.task, userInvoked: boolean): Promise<void> {
         if (!task) {
             return
         }
         const editor = vscode.window.visibleTextEditors.find(
-            (editor) => editor.document.uri.toString() === task.editorDocument.uri.toString()
+            (editor) => editor.document.uri.toString() === task.document.uri.toString()
         )
         if (!editor) {
             return
         }
-        this.inlineChatProvider.sendTelemetryEvent(
-            {
-                userDecision: 'ACCEPT',
-            },
-            this.task
-        )
+        if (userInvoked) {
+            this.inlineChatProvider.sendTelemetryEvent(
+                {
+                    userDecision: 'ACCEPT',
+                },
+                this.task
+            )
+        }
         const deletions = task.diff.filter((diff) => diff.type === 'deletion')
         await editor.edit(
             (editBuilder) => {
@@ -68,24 +73,27 @@ export class InlineChatController {
         this.decorator.applyDecorations(task)
         await this.updateTaskAndLenses(task)
         this.referenceLogController.addReferenceLog(task.codeReferences, task.replacement ? task.replacement : '')
+        await this.reset()
     }
 
-    public async rejectAllChanges(task = this.task): Promise<void> {
+    public async rejectAllChanges(task = this.task, userInvoked: boolean): Promise<void> {
         if (!task) {
             return
         }
         const editor = vscode.window.visibleTextEditors.find(
-            (editor) => editor.document.uri.toString() === task.editorDocument.uri.toString()
+            (editor) => editor.document.uri.toString() === task.document.uri.toString()
         )
         if (!editor) {
             return
         }
-        this.inlineChatProvider.sendTelemetryEvent(
-            {
-                userDecision: 'REJECT',
-            },
-            this.task
-        )
+        if (userInvoked) {
+            this.inlineChatProvider.sendTelemetryEvent(
+                {
+                    userDecision: 'REJECT',
+                },
+                this.task
+            )
+        }
         const insertions = task.diff.filter((diff) => diff.type === 'insertion')
         await editor.edit(
             (editBuilder) => {
@@ -100,6 +108,7 @@ export class InlineChatController {
         this.decorator.applyDecorations(task)
         await this.updateTaskAndLenses(task)
         this.referenceLogController.addReferenceLog(task.codeReferences, task.replacement ? task.replacement : '')
+        await this.reset()
     }
 
     // Line-by-line accept and reject functionality is currently under discussion and will be temporarily commented out
@@ -185,6 +194,11 @@ export class InlineChatController {
             }
         }
         this.codeLenseProvider.updateLenses(task)
+        if (task.state === TaskState.InProgress) {
+            if (vscode.window.activeTextEditor) {
+                await this.inlineLineAnnotationController.hide(vscode.window.activeTextEditor)
+            }
+        }
         await this.refreshCodeLenses(task)
         if (task.state === TaskState.Complete) {
             await this.reset()
@@ -203,12 +217,12 @@ export class InlineChatController {
 
     private async reset() {
         this.task = undefined
-        this.codeLenseProvider.setTask(undefined)
+        this.inlineLineAnnotationController.enable()
         await setContext('amazonq.inline.codelensShortcutEnabled', undefined)
     }
 
     private async refreshCodeLenses(task: InlineTask): Promise<void> {
-        await vscode.commands.executeCommand('vscode.executeCodeLensProvider', task.editorDocument.uri)
+        await vscode.commands.executeCommand('vscode.executeCodeLensProvider', task.document.uri)
     }
 
     public async inlineQuickPick(previouseQuery?: string) {
@@ -217,10 +231,18 @@ export class InlineChatController {
             return
         }
 
+        if (this.task && this.task.isActiveState()) {
+            void vscode.window.showWarningMessage(
+                'Amazon Q: Reject or Accept the current suggestion before creating a new one'
+            )
+            return
+        }
+
         await vscode.window
             .showInputBox({
-                value: previouseQuery || '',
-                placeHolder: 'Enter instrucations...',
+                value: previouseQuery ?? '',
+                placeHolder: 'Enter instructions for Q',
+                prompt: codicon`${getIcon('aws-amazonq-q-white')} Edit code`,
             })
             .then(async (query) => {
                 this.userQuery = query
@@ -228,7 +250,7 @@ export class InlineChatController {
                     return
                 }
                 this.task = await this.createTask(query, editor.document, editor.selection)
-                this.codeLenseProvider.setTask(this.task)
+                await this.inlineLineAnnotationController.disable(editor)
                 await this.computeDiffAndRenderOnEditor(query, editor.document)
             })
     }
@@ -239,12 +261,11 @@ export class InlineChatController {
         }
 
         await this.updateTaskAndLenses(this.task, TaskState.InProgress)
-        const language = extractLanguageNameFromFile(document)
-        const pureCodePrompt = this.inlineChatProvider.getPureCodePrompt(query, this.task.selectedText, language)
-        getLogger().info(`codePrompt:\n${pureCodePrompt}`)
+        const prompt = query
+        getLogger().info(`prompt:\n${prompt}`)
         const uuid = randomUUID()
         const message = {
-            message: pureCodePrompt,
+            message: prompt,
             messageId: uuid,
             command: undefined,
             userIntent: undefined,
@@ -258,6 +279,17 @@ export class InlineChatController {
         const response = await this.inlineChatProvider.processPromptMessage(message)
         this.task.requestId = response?.$metadata.requestId
 
+        // Deselect all code
+        const editor = vscode.window.activeTextEditor
+        if (editor) {
+            const selection = editor.selection
+            if (!selection.isEmpty) {
+                const cursor = selection.active
+                const newSelection = new vscode.Selection(cursor, cursor)
+                editor.selection = newSelection
+            }
+        }
+
         if (response) {
             let qSuggestedCodeResponse = ''
             for await (const chatEvent of response.generateAssistantResponseResponse!) {
@@ -267,9 +299,6 @@ export class InlineChatController {
                 ) {
                     if (responseStartLatency === undefined) {
                         responseStartLatency = performance.now() - requestStart
-                    }
-                    if (this.task.previouseDiff) {
-                        await this.rejectAllChanges(this.task)
                     }
 
                     qSuggestedCodeResponse += chatEvent.assistantResponseEvent.content
@@ -295,7 +324,7 @@ export class InlineChatController {
                     this.task.codeReferences = this.task.codeReferences.concat(chatEvent.codeReferenceEvent?.references)
                     // clear diff if user settings is off for code reference
                     if (!CodeWhispererSettings.instance.isSuggestionsWithCodeReferencesEnabled()) {
-                        await this.rejectAllChanges(this.task)
+                        await this.rejectAllChanges(this.task, false)
                         void vscode.window.showInformationMessage(
                             'Your settings do not allow code generation with references.'
                         )
@@ -310,6 +339,7 @@ export class InlineChatController {
                 this.task.responseStartLatency = responseStartLatency
                 this.task.responseEndLatency = performance.now() - requestStart
             }
+            getLogger().info(`qSuggestedCodeResponse:\n${qSuggestedCodeResponse}`)
             if (codeChunkCounter === 1) {
                 // If the code response has only one chunk, we don't need to execute the final diff
                 await this.updateTaskAndLenses(this.task, TaskState.WaitingForDecision)
@@ -317,10 +347,9 @@ export class InlineChatController {
                 this.undoListener(this.task)
                 return
             }
-            if (this.task.previouseDiff) {
-                await this.rejectAllChanges(this.task)
-            }
-            getLogger().info(`qSuggestedCodeResponse:\n${qSuggestedCodeResponse}`)
+            // if (this.task.previouseDiff) {
+            //     await this.rejectAllChanges(this.task, true)
+            // }
             const transformedResponse = responseTransformer(qSuggestedCodeResponse, this.task, true)
             if (transformedResponse) {
                 const textDiff = computeDiff(transformedResponse, this.task, false)
@@ -350,9 +379,21 @@ export class InlineChatController {
     ) {
         const adjustedTextDiff = adjustTextDiffForEditing(textDiff)
         const visibleEditor = vscode.window.visibleTextEditors.find(
-            (editor) => editor.document.uri === task.editorDocument.uri
+            (editor) => editor.document.uri === task.document.uri
         )
+        const previousDiff = task.previouseDiff?.filter((diff) => diff.type === 'insertion')
+
         if (visibleEditor) {
+            if (previousDiff) {
+                await visibleEditor.edit(
+                    (editBuilder) => {
+                        for (const insertion of previousDiff) {
+                            editBuilder.delete(insertion.range)
+                        }
+                    },
+                    { undoStopAfter: false, undoStopBefore: false }
+                )
+            }
             await visibleEditor.edit(
                 (editBuilder) => {
                     for (const change of adjustedTextDiff) {
@@ -364,10 +405,17 @@ export class InlineChatController {
                 undoOption ?? { undoStopBefore: true, undoStopAfter: false }
             )
         } else {
+            if (previousDiff) {
+                const edit = new vscode.WorkspaceEdit()
+                for (const insertion of previousDiff) {
+                    edit.delete(task.document.uri, insertion.range)
+                }
+                await vscode.workspace.applyEdit(edit)
+            }
             const edit = new vscode.WorkspaceEdit()
             for (const change of textDiff) {
                 if (change.type === 'insertion') {
-                    edit.insert(task.editorDocument.uri, change.range.start, change.replacementText)
+                    edit.insert(task.document.uri, change.range.start, change.replacementText)
                 }
             }
             await vscode.workspace.applyEdit(edit)
@@ -378,13 +426,17 @@ export class InlineChatController {
         const listener: vscode.Disposable = vscode.workspace.onDidChangeTextDocument(async (event) => {
             const { document, contentChanges } = event
 
-            if (document.uri.toString() !== task.editorDocument.uri.toString()) {
+            if (document.uri.toString() !== task.document.uri.toString()) {
                 return
             }
 
             const changeIntersectsRange = contentChanges.some((change) => {
                 const { range } = change
-                return !(range.end.isBefore(task.selectedRange.start) || range.start.isAfter(task.selectedRange.end))
+                if (task.selectedRange) {
+                    return !(
+                        range.end.isBefore(task.selectedRange.start) || range.start.isAfter(task.selectedRange.end)
+                    )
+                }
             })
 
             if (!changeIntersectsRange) {
