@@ -15,6 +15,7 @@ import { ReferenceLogController } from 'aws-core-vscode/codewhispererChat'
 import { CodeWhispererSettings } from 'aws-core-vscode/codewhisperer'
 import { codicon, getIcon, getLogger, messages, setContext, Timeout } from 'aws-core-vscode/shared'
 import { InlineLineAnnotationController } from '../decorations/inlineLineAnnotationController'
+import { fixEofNewline } from './utils'
 
 export class InlineChatController {
     private task: InlineTask | undefined
@@ -24,6 +25,7 @@ export class InlineChatController {
     private readonly referenceLogController = new ReferenceLogController()
     private readonly inlineLineAnnotationController: InlineLineAnnotationController
     private userQuery: string | undefined
+    private listeners: vscode.Disposable[] = []
 
     constructor(context: vscode.ExtensionContext) {
         this.inlineChatProvider = new InlineChatProvider()
@@ -216,6 +218,9 @@ export class InlineChatController {
     }
 
     private async reset() {
+        this.listeners.forEach((listener) => listener.dispose())
+        this.listeners = []
+
         this.task = undefined
         this.inlineLineAnnotationController.enable()
         await setContext('amazonq.inline.codelensShortcutEnabled', undefined)
@@ -249,6 +254,7 @@ export class InlineChatController {
                 if (!query) {
                     return
                 }
+                await fixEofNewline(editor)
                 this.task = await this.createTask(query, editor.document, editor.selection)
                 await this.inlineLineAnnotationController.disable(editor)
                 await this.computeDiffAndRenderOnEditor(query, editor.document)
@@ -331,6 +337,12 @@ export class InlineChatController {
                         await this.updateTaskAndLenses(this.task, TaskState.Complete)
                         return
                     }
+                }
+                if (chatEvent.error) {
+                    await this.rejectAllChanges(this.task, false)
+                    void vscode.window.showErrorMessage(`Amazon Q encountered an error: ${chatEvent.error.message}`)
+                    await this.updateTaskAndLenses(this.task, TaskState.Complete)
+                    return
                 }
             }
 
@@ -453,5 +465,7 @@ export class InlineChatController {
                 listener.dispose()
             }
         })
+
+        this.listeners.push(listener)
     }
 }
