@@ -2450,14 +2450,24 @@
         },
         "UserModificationEvent": {
             "type": "structure",
-            "required": ["sessionId", "requestId", "programmingLanguage", "modificationPercentage", "timestamp"],
+            "required": [
+                "sessionId",
+                "requestId",
+                "programmingLanguage",
+                "modificationPercentage",
+                "timestamp",
+                "acceptedCharacterCount",
+                "unmodifiedAcceptedCharacterCount"
+            ],
             "members": {
                 "sessionId": { "shape": "UUID" },
                 "requestId": { "shape": "UUID" },
                 "programmingLanguage": { "shape": "ProgrammingLanguage" },
                 "modificationPercentage": { "shape": "Double" },
                 "customizationArn": { "shape": "CustomizationArn" },
-                "timestamp": { "shape": "Timestamp" }
+                "timestamp": { "shape": "Timestamp" },
+                "acceptedCharacterCount": { "shape": "PrimitiveInteger" },
+                "unmodifiedAcceptedCharacterCount": { "shape": "PrimitiveInteger" }
             }
         },
         "UserSettings": {
@@ -2490,7 +2500,9 @@
                 "triggerToResponseLatencyMilliseconds": { "shape": "Double" },
                 "suggestionReferenceCount": { "shape": "PrimitiveInteger" },
                 "generatedLine": { "shape": "PrimitiveInteger" },
-                "numberOfRecommendations": { "shape": "PrimitiveInteger" }
+                "numberOfRecommendations": { "shape": "PrimitiveInteger" },
+                "perceivedLatencyMilliseconds": { "shape": "Double" },
+                "acceptedCharacterCount": { "shape": "PrimitiveInteger" }
             }
         },
         "ValidationException": {
